@@ -219,7 +219,7 @@
             font-size: 11px;
         }
 
-        /* ========== АДАПТИВНОСТЬ ========== */
+        /* Адаптивность */
         @media (max-width: 1024px) {
             .dashboard { gap: 20px; }
             .form-panel { min-width: 260px; }
@@ -291,15 +291,19 @@
 
         <div class="dashboard">
             <div class="form-panel">
-                <div class="section-title">📋 Управление сменами</div>
+                <div class="section-title">Управление сменами</div>
                 <form id="shiftForm">
                     <div class="form-group">
                         <label>👤 ФИО сотрудника</label>
-                        <input type="text" id="employeeName" required>
+                        <select id="employeeName" required>
+                            <option value="">-- Выберите сотрудника --</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>🏭 Цех</label>
-                        <input type="text" id="workshop" required>
+                        <select id="workshop" required>
+                            <option value="">-- Выберите цех --</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>📅 Дата смены</label>
@@ -325,7 +329,7 @@
             </div>
 
             <div class="table-panel">
-                <div class="section-title"> График смен</div>
+                <div class="section-title">График смен</div>
                 <div class="filter-bar">
                     <input type="text" id="filterWorkshop" placeholder="Фильтр по цеху">
                     <select id="filterType">
@@ -341,7 +345,7 @@
                         <thead>
                             <tr><th>ID</th><th>Сотрудник</th><th>Цех</th><th>Дата</th><th>Смена</th><th>Примечание</th><th>Действия</th></tr>
                         </thead>
-                        <tbody id="tableBody"><tr><td colspan="7">Загрузка......</td></tr></tbody>
+                        <tbody id="tableBody"><tr><td colspan="7">Загрузка...</td></tr></tbody>
                     </table>
                 </div>
             </div>
@@ -355,6 +359,37 @@
         const user = JSON.parse(localStorage.getItem('user'));
         if (user.role !== 'admin') window.location.href = '/worker.html';
         document.getElementById('userName').innerHTML = `${user.fullname}`;
+
+        // Загрузка списков сотрудников и цехов
+        async function loadSelects() {
+            try {
+                // Загрузка сотрудников
+                const empRes = await fetch('/api/shifts/employees', { headers: { 'Authorization': `Bearer ${token}` } });
+                const employees = await empRes.json();
+                const employeeSelect = document.getElementById('employeeName');
+                employeeSelect.innerHTML = '<option value="">-- Выберите сотрудника --</option>';
+                employees.forEach(emp => {
+                    const option = document.createElement('option');
+                    option.value = emp.employee_name;
+                    option.textContent = emp.employee_name;
+                    employeeSelect.appendChild(option);
+                });
+
+                // Загрузка цехов
+                const workshopRes = await fetch('/api/shifts/workshops', { headers: { 'Authorization': `Bearer ${token}` } });
+                const workshops = await workshopRes.json();
+                const workshopSelect = document.getElementById('workshop');
+                workshopSelect.innerHTML = '<option value="">-- Выберите цех --</option>';
+                workshops.forEach(ws => {
+                    const option = document.createElement('option');
+                    option.value = ws.workshop;
+                    option.textContent = ws.workshop;
+                    workshopSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Ошибка загрузки списков:', error);
+            }
+        }
 
         async function apiRequest(endpoint, options = {}) {
             const res = await fetch(`/api/shifts${endpoint}`, {
@@ -430,20 +465,28 @@
                 shift_type: document.getElementById('shiftType').value,
                 note: document.getElementById('note').value
             };
+            
+            if (!data.employee_name || !data.workshop) {
+                alert('Выберите сотрудника и цех!');
+                return;
+            }
+            
             const editId = document.getElementById('editId').value;
             const url = editId ? `/api/shifts/${editId}` : '/api/shifts';
             const method = editId ? 'PUT' : 'POST';
             await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(data) });
             document.getElementById('shiftForm').reset();
             document.getElementById('editId').value = '';
-            document.getElementById('submitBtn').innerHTML = '➕ Добавить смену';
+            document.getElementById('submitBtn').innerHTML = 'Добавить смену';
+            // Обновляем списки после добавления
+            loadSelects();
             loadData();
         });
 
         document.getElementById('cancelBtn').addEventListener('click', () => {
             document.getElementById('shiftForm').reset();
             document.getElementById('editId').value = '';
-            document.getElementById('submitBtn').innerHTML = '➕ Добавить смену';
+            document.getElementById('submitBtn').innerHTML = 'Добавить смену';
         });
         document.getElementById('resetFilters').addEventListener('click', () => {
             document.getElementById('filterWorkshop').value = '';
@@ -456,6 +499,8 @@
         function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])); }
         function logout() { localStorage.clear(); window.location.href = '/login.html'; }
 
+        // Инициализация
+        loadSelects();
         loadData();
     </script>
 </body>
