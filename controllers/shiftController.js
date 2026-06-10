@@ -1,6 +1,6 @@
 const { db } = require('../config/database');
 
-// Получить все смены (для админа)
+// Получить все смены
 const getAllShifts = (req, res) => {
     db.all("SELECT * FROM shifts ORDER BY shift_date DESC, id DESC", [], (err, shifts) => {
         if (err) {
@@ -94,4 +94,53 @@ const getStats = (req, res) => {
     });
 };
 
-module.exports = { getAllShifts, getMyWorkshopShifts, getShiftById, createShift, updateShift, deleteShift, getStats };
+// НОВЫЕ МЕТОДЫ для получения списков
+const getEmployees = (req, res) => {
+    db.all("SELECT DISTINCT employee_name FROM shifts ORDER BY employee_name", [], (err, employees) => {
+        if (err) {
+            return res.status(500).json({ error: 'Ошибка загрузки сотрудников' });
+        }
+        // Также добавляем сотрудников из таблицы users
+        db.all("SELECT DISTINCT fullname as employee_name FROM users WHERE role = 'worker' ORDER BY fullname", [], (err, users) => {
+            if (!err && users) {
+                const allEmployees = [...employees, ...users];
+                const unique = [...new Map(allEmployees.map(e => [e.employee_name, e])).values()];
+                unique.sort((a, b) => a.employee_name.localeCompare(b.employee_name));
+                res.json(unique);
+            } else {
+                res.json(employees);
+            }
+        });
+    });
+};
+
+const getWorkshops = (req, res) => {
+    db.all("SELECT DISTINCT workshop FROM shifts ORDER BY workshop", [], (err, workshops) => {
+        if (err) {
+            return res.status(500).json({ error: 'Ошибка загрузки цехов' });
+        }
+        // Добавляем цеха из таблицы users
+        db.all("SELECT DISTINCT workshop FROM users ORDER BY workshop", [], (err, userWorkshops) => {
+            if (!err && userWorkshops) {
+                const allWorkshops = [...workshops, ...userWorkshops];
+                const unique = [...new Map(allWorkshops.map(w => [w.workshop, w])).values()];
+                unique.sort((a, b) => a.workshop.localeCompare(b.workshop));
+                res.json(unique);
+            } else {
+                res.json(workshops);
+            }
+        });
+    });
+};
+
+module.exports = { 
+    getAllShifts, 
+    getMyWorkshopShifts, 
+    getShiftById, 
+    createShift, 
+    updateShift, 
+    deleteShift, 
+    getStats,
+    getEmployees,
+    getWorkshops
+};
